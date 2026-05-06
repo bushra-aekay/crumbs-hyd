@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>render</title></head>
+<body>
+<div id="status">loading...</div>
+<div id="out"></div>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+(async () => {
+  try {
+    const status = document.getElementById('status');
+    status.textContent = 'pdfjs:' + typeof pdfjsLib;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const r = await fetch('../uploads/logo_print.pdf');
+    status.textContent += ' fetched ' + r.status;
+    const buf = new Uint8Array(await r.arrayBuffer());
+    status.textContent += ' bytes:' + buf.length;
+    const pdf = await pdfjsLib.getDocument({ data: buf, disableFontFace: true, useSystemFonts: false }).promise;
+    status.textContent += ' pages:' + pdf.numPages;
+    window.__results = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 6 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'white'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      document.getElementById('out').appendChild(canvas);
+      window.__results.push(canvas.toDataURL('image/png'));
+      status.textContent += ' rendered:' + i;
+    }
+    window.__done = true;
+    status.textContent += ' DONE';
+  } catch (e) {
+    document.getElementById('status').textContent = 'ERR: ' + e.message;
+    window.__err = e.message;
+  }
+})();
+</script>
+</body></html>

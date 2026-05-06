@@ -1,0 +1,60 @@
+/* Crumbs.hyd — tokens & utilities */
+:root {
+  --red: #FF3030;
+  --red-deep: #E11A1A;
+  --cream: #FDF8E8;
+  --cream-warm: #F7EFD8;
+  --ink: #1A0F0B;
+  --ink-2: #4A2E22;
+  --ink-3: #8A6F60;
+  --line: rgba(26, 15, 11, 0.10);
+  --line-cream: rgba(253, 248, 232, 0.18);
+  --shadow-card: 0 1px 0 rgba(26,15,11,0.04), 0 8px 24px -12px rgba(26,15,11,0.18);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  color: var(--ink);
+  background: #ECEAE3;
+  -webkit-font-smoothing: antialiased;
+}
+.serif {
+  font-family: 'Cormorant Garamond', 'Boston Angel', 'Playfair Display', serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.serif-italic { font-family: 'Cormorant Garamond', serif; font-style: italic; font-weight: 500; }
+.mono { font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace; }
+
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+img { display: block; max-width: 100%; }
+
+/* — utilities — */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* — phone shell on desktop — */
+.crumbs-app {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  background: var(--cream);
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* sticky header gradient — protects content scrolling beneath */
+.scrim-top {
+  position: sticky; top: 0; z-index: 5;
+  background: linear-gradient(180deg, var(--cream) 65%, rgba(253,248,232,0));
+  padding-bottom: 8px;
+}
