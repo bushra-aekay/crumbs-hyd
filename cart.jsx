@@ -102,14 +102,30 @@ const CartDrawer = ({ open, onClose, cart, dispatch, onCheckout }) => {
             </div>
 
             <div style={{ marginTop: 18, padding: '14px 0', borderTop: '1px dashed var(--line)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)', marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)', marginBottom: 10 }}>
                 <span>subtotal</span><span>{fmt(total)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-3)', marginBottom: 12 }}>
-                <span>uber / parcel</span><span className="serif-italic">confirmed in DM</span>
+
+              {/* Delivery fee — treated as a real line item */}
+              <div style={{
+                marginBottom: 14, padding: '10px 12px',
+                background: 'rgba(26,15,11,0.04)', borderRadius: 10,
+                border: '1px solid var(--line)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>uber / rapido delivery</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>paid to rider</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.45 }}>
+                  calculated by the app based on your distance from Mehdipatnam — you pay the rider directly
+                </div>
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>total</span>
+                <div>
+                  <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>your total</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>+ delivery fee on top</div>
+                </div>
                 <span className="serif" style={{ fontSize: 28, color: 'var(--ink)' }}>{fmt(total)}</span>
               </div>
             </div>

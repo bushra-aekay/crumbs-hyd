@@ -55,7 +55,7 @@ const MenuHeader = ({ go, scroll, headerStyle }) => {
           <div style={{ marginTop: 22, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
             <Pill icon="star" text={`${brand.rating} · ${brand.reviews}+ orders`}/>
             <Pill icon="pin" text={brand.location}/>
-            <Pill icon="clock" text="pickup only · order ahead"/>
+            <Pill icon="clock" text="uber / rapido · order ahead"/>
           </div>
 
           <p className="serif-italic" style={{
@@ -362,8 +362,10 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
   const onDec = (id, vi) => dispatch({ t: 'dec', id, vi });
   const onToggleFav = (id) => { toggleFav(id); openToast(favs.includes(id) ? 'removed from favourites' : 'saved to favourites'); };
 
-  const totalQty = cart.reduce((s, l) => s + l.qty, 0);
-  const totalAmt = cart.reduce((s, l) => {
+  // Only count items that still exist in the live menu
+  const liveCart = cart.filter(l => data.items.find(i => i.id === l.id));
+  const totalQty = liveCart.reduce((s, l) => s + l.qty, 0);
+  const totalAmt = liveCart.reduce((s, l) => {
     const item = data.items.find(i => i.id === l.id);
     return s + (item?.variants[l.vi]?.price || 0) * l.qty;
   }, 0);
