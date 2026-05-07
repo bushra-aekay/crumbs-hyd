@@ -28,7 +28,7 @@ const buildOrderText = (cart, customer) => {
     ``,
     `name: ${customer.name || '—'}`,
     `phone: ${customer.phone || '—'}`,
-    `pickup / parcel: ${customer.pickup || '—'}`,
+    `uber / parcel: ${customer.delivery || '—'}`,
     customer.note ? `note: ${customer.note}` : null,
     ``,
     `please confirm the timing slot, final price & payment details. happy to give 4–12h notice 🤍`,
@@ -101,7 +101,7 @@ const CartDrawer = ({ open, onClose, cart, dispatch, onCheckout }) => {
                 <span>subtotal</span><span>{fmt(total)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-3)', marginBottom: 12 }}>
-                <span>pickup / parcel</span><span className="serif-italic">confirmed in DM</span>
+                <span>uber / parcel</span><span className="serif-italic">confirmed in DM</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>total</span>
@@ -135,9 +135,10 @@ const CheckoutSheet = ({ open, onClose, cart, openToast }) => {
   const saved = getSaved();
   const hasSaved = !!(saved?.name && saved?.phone);
 
-  const [customer, setCustomer] = useState(() => saved || { name: '', phone: '', pickup: '', note: '' });
-  const [usingSaved, setUsingSaved] = useState(hasSaved);
-  const [step, setStep] = useState('form'); // form | summary
+  const blank = { name: '', phone: '', delivery: '', note: '' };
+  const [customer, setCustomer] = useState(() => saved ? { ...blank, ...saved } : blank);
+  const [orderedBefore, setOrderedBefore] = useState(hasSaved);
+  const [step, setStep] = useState('form');
   const [copied, setCopied] = useState(false);
   const text = useMemo(() => buildOrderText(cart, customer), [cart, customer]);
 
@@ -145,14 +146,21 @@ const CheckoutSheet = ({ open, onClose, cart, openToast }) => {
     if (!open) { setStep('form'); setCopied(false); }
     if (open) {
       const s = getSaved();
-      if (s) { setCustomer(s); setUsingSaved(true); }
+      if (s) { setCustomer({ ...blank, ...s }); setOrderedBefore(true); }
+      else { setCustomer(blank); setOrderedBefore(false); }
     }
   }, [open]);
 
-  const clearSaved = () => {
-    localStorage.removeItem('crumbs-customer');
-    setCustomer({ name: '', phone: '', pickup: '', note: '' });
-    setUsingSaved(false);
+  const tapOrderedBefore = () => {
+    const s = getSaved();
+    if (!orderedBefore) {
+      if (s) { setCustomer({ ...blank, ...s }); }
+      setOrderedBefore(true);
+    } else {
+      setCustomer(blank);
+      setOrderedBefore(false);
+      localStorage.removeItem('crumbs-customer');
+    }
   };
 
   const valid = customer.name.trim() && customer.phone.trim();
@@ -161,6 +169,7 @@ const CheckoutSheet = ({ open, onClose, cart, openToast }) => {
     if (!valid) return;
     const { note, ...rest } = customer;
     localStorage.setItem('crumbs-customer', JSON.stringify({ ...rest, note: '' }));
+    setOrderedBefore(true);
     setStep('summary');
   };
 
@@ -188,31 +197,38 @@ const CheckoutSheet = ({ open, onClose, cart, openToast }) => {
         <div style={{ padding: '4px 22px 22px' }}>
           <div className="serif" style={{ fontSize: 28, letterSpacing: '-0.02em', marginBottom: 4 }}>almost done</div>
           <div className="serif-italic" style={{ fontSize: 14, color: 'var(--ink-3)', marginBottom: 18 }}>
-            {usingSaved ? `welcome back, ${customer.name.split(' ')[0]}.` : 'tell us where this box is going.'}
+            {orderedBefore && customer.name ? `welcome back, ${customer.name.split(' ')[0]}.` : 'tell us where this box is going.'}
           </div>
 
-          {/* Saved details banner */}
-          {usingSaved && hasSaved && (
+          {/* I've ordered before toggle */}
+          <button onClick={tapOrderedBefore} style={{
+            width: '100%', marginBottom: 18, padding: '12px 14px',
+            background: orderedBefore ? 'rgba(31,138,91,0.08)' : 'rgba(26,15,11,0.04)',
+            border: '1px solid ' + (orderedBefore ? 'rgba(31,138,91,0.3)' : 'var(--line)'),
+            borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+            transition: 'all 0.15s',
+          }}>
             <div style={{
-              marginBottom: 18, padding: '12px 14px',
-              background: 'rgba(31,138,91,0.08)', border: '1px solid rgba(31,138,91,0.22)',
-              borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: 10,
+              width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+              background: orderedBefore ? '#1F8A5B' : 'transparent',
+              border: '1.5px solid ' + (orderedBefore ? '#1F8A5B' : 'var(--ink-3)'),
+              display: 'grid', placeItems: 'center',
             }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F8A5B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12l5 5L20 7"/>
-              </svg>
-              <div style={{ flex: 1, fontSize: 13, color: '#1F5C42' }}>
-                using saved details for <strong>{customer.name}</strong>
-              </div>
-              <button onClick={clearSaved} style={{ fontSize: 12, color: 'var(--ink-3)', textDecoration: 'underline' }}>
-                clear
-              </button>
+              {orderedBefore && <Icon name="check" size={13} stroke={2.5}/>}
             </div>
-          )}
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: orderedBefore ? '#1F5C42' : 'var(--ink)' }}>
+                i've ordered before
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 1 }}>
+                {orderedBefore && customer.name ? `using saved details for ${customer.name}` : 'tap to load your saved details'}
+              </div>
+            </div>
+          </button>
 
           <Field label="your name" value={customer.name} onChange={v => setCustomer({...customer, name: v})} placeholder="e.g. Anaya"/>
-          <Field label="phone" value={customer.phone} onChange={v => setCustomer({...customer, phone: v})} placeholder="10-digit, for the parcel" inputMode="tel"/>
-          <Field label="pickup or parcel address" value={customer.pickup} onChange={v => setCustomer({...customer, pickup: v})} placeholder="'pickup' (mehdipatnam) — or your area for parcel" multiline/>
+          <Field label="phone" value={customer.phone} onChange={v => setCustomer({...customer, phone: v})} placeholder="10-digit" inputMode="tel"/>
+          <Field label="uber / parcel — your area" value={customer.delivery} onChange={v => setCustomer({...customer, delivery: v})} placeholder="share your area — we'll arrange uber or parcel (fee is yours)" multiline/>
           <Field label="any note? (optional)" value={customer.note} onChange={v => setCustomer({...customer, note: v})} placeholder="birthday on the 14th, surprise for…" multiline/>
 
           <button onClick={goSummary} disabled={!valid} style={{
@@ -251,24 +267,30 @@ const CheckoutSheet = ({ open, onClose, cart, openToast }) => {
               <Icon name={copied ? 'check' : 'copy'} size={16}/>
               {copied ? 'copied!' : 'copy message'}
             </button>
-            <a href={igUrl} target="_blank" style={{
+            <button onClick={async () => {
+              // Always copy first so user has it even if redirect fails
+              try { await navigator.clipboard.writeText(text); }
+              catch { const ta = document.getElementById('cb-text'); ta?.select(); document.execCommand('copy'); }
+              // Navigate — on mobile this opens the Instagram app directly
+              window.location.href = igUrl;
+            }} style={{
               flex: 1, padding: '14px', textAlign: 'center',
               background: 'var(--ink)', color: 'var(--cream)',
-              borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600, textDecoration: 'none',
+              borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}>
               open DM <Icon name="arrow-right" size={14}/>
-            </a>
+            </button>
           </div>
 
           {/* Next steps — pulled from "How to" card */}
           <div style={{ marginTop: 24, padding: '16px 18px', background: 'var(--cream-warm)', borderRadius: 'var(--radius-md)' }}>
             <div className="serif" style={{ fontSize: 16, color: 'var(--red)', marginBottom: 10 }}>what happens next</div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.65, color: 'var(--ink-2)' }}>
-              <li>we'll reply to confirm your bakes, the pickup slot & final price.</li>
+              <li>we'll reply to confirm your bakes, the timing slot & final price.</li>
               <li>UPI/GPay pre-payment locks it in — share a screenshot of the transfer.</li>
-              <li>we'll text when it's ready at <strong>Mehdipatnam</strong> for pickup.</li>
-              <li>need it parceled? we can book a delivery for you — fee paid by you, directly to the rider.</li>
+              <li>we'll arrange an uber / parcel to you — delivery fee is yours, paid directly to the rider.</li>
+              <li>we'll text you once it's out for delivery.</li>
             </ol>
             <div style={{
               marginTop: 12, padding: '10px 12px', background: 'rgba(255,48,48,0.08)',

@@ -389,7 +389,7 @@ const ItemsTab = ({ passcode, onSave }) => {
 
       {/* Add new item FAB */}
       <button onClick={() => setEditing({ _new: true, cat: filterCat !== 'all' ? filterCat : data.categories[0]?.id })} style={{
-        position: 'fixed', right: 16, bottom: 24,
+        position: 'fixed', right: 'max(16px, calc((100vw - 430px) / 2 + 16px))', bottom: 24,
         padding: '12px 20px', background: 'var(--red)', color: 'var(--cream)',
         borderRadius: 999, fontSize: 14, fontWeight: 600,
         boxShadow: '0 8px 24px -8px rgba(255,48,48,0.5)',
@@ -439,7 +439,7 @@ const CategoriesTab = ({ passcode, onSave }) => {
       })}
 
       <button onClick={() => setEditing({ _new: true })} style={{
-        position: 'fixed', right: 16, bottom: 24,
+        position: 'fixed', right: 'max(16px, calc((100vw - 430px) / 2 + 16px))', bottom: 24,
         padding: '12px 20px', background: 'var(--ink)', color: 'var(--cream)',
         borderRadius: 999, fontSize: 14, fontWeight: 600,
         boxShadow: '0 8px 24px -8px rgba(26,15,11,0.35)',
