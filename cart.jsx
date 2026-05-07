@@ -5,6 +5,7 @@ const buildOrderText = (cart, customer) => {
   const data = window.CRUMBS_DATA;
   const lines = cart.map(l => {
     const it = data.items.find(i => i.id === l.id);
+    if (!it || !it.variants[l.vi]) return null; // item deleted — skip
     const v = it.variants[l.vi];
     const tops = (l.toppings || []).map(tid => it.toppings?.find(t => t.id === tid)).filter(Boolean);
     const topPrice = tops.reduce((s, t) => s + t.price, 0);
@@ -12,9 +13,10 @@ const buildOrderText = (cart, customer) => {
     const lineTotal = lineUnit * l.qty;
     const topStr = tops.length ? `\n   + toppings: ${tops.map(t => t.label).join(', ')}` : '';
     return `• ${it.name} (${v.label}) × ${l.qty} — ₹${lineTotal.toLocaleString('en-IN')}${topStr}`;
-  });
+  }).filter(Boolean);
   const total = cart.reduce((s, l) => {
     const it = data.items.find(i => i.id === l.id);
+    if (!it || !it.variants[l.vi]) return s; // skip deleted items
     const tops = (l.toppings || []).map(tid => it.toppings?.find(t => t.id === tid)).filter(Boolean);
     const topPrice = tops.reduce((ss, t) => ss + t.price, 0);
     return s + (it.variants[l.vi].price + topPrice) * l.qty;
@@ -38,36 +40,39 @@ const buildOrderText = (cart, customer) => {
 
 const CartDrawer = ({ open, onClose, cart, dispatch, onCheckout }) => {
   const data = window.CRUMBS_DATA;
+  // Filter out any cart lines whose item was deleted from the menu
+  const liveCart = cart.filter(l => data.items.find(i => i.id === l.id));
   const lineUnitPrice = (l) => {
     const it = data.items.find(i => i.id === l.id);
+    if (!it || !it.variants[l.vi]) return 0;
     const tops = (l.toppings || []).map(tid => it.toppings?.find(t => t.id === tid)).filter(Boolean);
     return it.variants[l.vi].price + tops.reduce((s, t) => s + t.price, 0);
   };
-  const total = cart.reduce((s,l) => s + lineUnitPrice(l) * l.qty, 0);
+  const total = liveCart.reduce((s,l) => s + lineUnitPrice(l) * l.qty, 0);
 
   return (
     <Sheet open={open} onClose={onClose}>
       <div style={{ padding: '4px 22px 22px' }}>
         <div className="serif" style={{ fontSize: 28, letterSpacing: '-0.02em', marginBottom: 4 }}>your box</div>
         <div className="serif-italic" style={{ fontSize: 14, color: 'var(--ink-3)', marginBottom: 18 }}>
-          {cart.length === 0 ? 'still empty.' : 'almost there.'}
+          {liveCart.length === 0 ? 'still empty.' : 'almost there.'}
         </div>
 
-        {cart.length === 0 ? (
+        {liveCart.length === 0 ? (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
             add a bake from the menu to start.
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {cart.map((l, idx) => {
+              {liveCart.map((l, idx) => {
                 const it = data.items.find(i => i.id === l.id);
                 const v = it.variants[l.vi];
                 const tops = (l.toppings || []).map(tid => it.toppings?.find(t => t.id === tid)).filter(Boolean);
                 return (
                   <div key={`${l.id}-${l.vi}-${l.sig||''}-${idx}`} style={{
                     display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '14px 0', borderBottom: idx < cart.length - 1 ? '1px solid var(--line)' : 0,
+                    padding: '14px 0', borderBottom: idx < liveCart.length - 1 ? '1px solid var(--line)' : 0,
                   }}>
                     <ProductMark id={it.id} size={48}/>
                     <div style={{ flex: 1, minWidth: 0 }}>

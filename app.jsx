@@ -44,6 +44,13 @@ const useMenuData = () => {
             id: i.id, cat: i.cat, name: i.name, blurb: i.blurb, more: i.more,
             tag: i.tag, variants: i.variants, toppings: i.toppings,
           }));
+          // Purge any localStorage cart lines for items that no longer exist
+          try {
+            const saved = JSON.parse(localStorage.getItem('crumbs-cart') || '[]');
+            const ids = new Set(window.CRUMBS_DATA.items.map(i => i.id));
+            const clean = saved.filter(l => ids.has(l.id));
+            if (clean.length !== saved.length) localStorage.setItem('crumbs-cart', JSON.stringify(clean));
+          } catch {}
         }
       } catch (e) {
         console.warn('Supabase fetch failed, using local data', e);
