@@ -25,13 +25,27 @@ const AdminGate = ({ onEnter }) => {
     setBusy(true); setErr('');
     try {
       const db = window.crumbsDB;
-      if (!db) { setErr('supabase not connected'); return; }
-      const { data, error } = await db.rpc('crumbs_hyd_admin_check', { p_passcode: pc.trim() });
-      if (error || !data) { setErr('wrong passcode — try again.'); setBusy(false); return; }
+      if (!db) { setErr('supabase not connected'); setBusy(false); return; }
+
+      let isValid = false;
+
+      // Try the RPC first (available after running supabase-admin-functions.sql)
+      const { data: rpcData, error: rpcErr } = await db.rpc('crumbs_hyd_admin_check', { p_passcode: pc.trim() });
+      if (!rpcErr) {
+        isValid = !!rpcData;
+      } else {
+        // RPC not set up yet — fall back to direct config table read
+        const { data: cfg, error: cfgErr } = await db
+          .from('crumbs_hyd_config').select('admin_passcode').eq('id', 1).single();
+        if (cfgErr) { setErr('could not reach supabase — check your connection.'); setBusy(false); return; }
+        isValid = cfg?.admin_passcode === pc.trim();
+      }
+
+      if (!isValid) { setErr('wrong passcode — try again.'); setBusy(false); return; }
       localStorage.setItem('crumbs-admin-pc', pc.trim());
       onEnter(pc.trim());
     } catch (e) {
-      setErr('connection error — check supabase setup.');
+      setErr('connection error: ' + (e.message || 'check supabase setup'));
     }
     setBusy(false);
   };
