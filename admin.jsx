@@ -117,9 +117,10 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
   const [form, setForm] = useAS(blank);
   const [busy, setBusy] = useAS(false);
   const [err, setErr] = useAS('');
+  const [confirmDel, setConfirmDel] = useAS(false);
 
   useAE(() => {
-    if (open) { setForm(item ? { ...item, variants: [...(item.variants||[])], toppings: [...(item.toppings||[])], images: [...(item.images||[])] } : blank); setErr(''); }
+    if (open) { setForm(item ? { ...item, variants: [...(item.variants||[])], toppings: [...(item.toppings||[])], images: [...(item.images||[])] } : blank); setErr(''); setConfirmDel(false); }
   }, [open, item]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -182,7 +183,6 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
   };
 
   const del = async () => {
-    if (!window.confirm(`delete "${form.name}"? this can't be undone.`)) return;
     setBusy(true);
     try { await adminCall('crumbs_hyd_delete_item', { p_passcode: passcode, p_id: form.id }); onDelete(); }
     catch (e) { setErr(e.message || 'delete failed'); setBusy(false); }
@@ -322,22 +322,40 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
 
         {err && <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--red)' }}>{err}</div>}
 
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={save} disabled={busy} style={{
-            flex: 1, padding: '14px', background: busy ? 'rgba(26,15,11,0.4)' : 'var(--ink)',
-            color: 'var(--cream)', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
-          }}>
-            {busy ? 'saving…' : 'save item'}
-          </button>
-          {!isNew && (
-            <button onClick={del} disabled={busy} style={{
-              padding: '14px 16px', background: 'rgba(255,48,48,0.08)', color: 'var(--red)',
-              borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+        {confirmDel ? (
+          <div style={{ background: 'rgba(255,48,48,0.07)', border: '1px solid rgba(255,48,48,0.2)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 12 }}>
+              delete "{form.name}"? this can't be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={del} disabled={busy} style={{
+                flex: 1, padding: '12px', background: 'var(--red)', color: 'var(--cream)',
+                borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+              }}>{busy ? 'deleting…' : 'yes, delete'}</button>
+              <button onClick={() => setConfirmDel(false)} disabled={busy} style={{
+                flex: 1, padding: '12px', background: 'rgba(26,15,11,0.06)', color: 'var(--ink)',
+                borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+              }}>cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={save} disabled={busy} style={{
+              flex: 1, padding: '14px', background: busy ? 'rgba(26,15,11,0.4)' : 'var(--ink)',
+              color: 'var(--cream)', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
             }}>
-              delete
+              {busy ? 'saving…' : 'save item'}
             </button>
-          )}
-        </div>
+            {!isNew && (
+              <button onClick={() => setConfirmDel(true)} disabled={busy} style={{
+                padding: '14px 16px', background: 'rgba(255,48,48,0.08)', color: 'var(--red)',
+                borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+              }}>
+                delete
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </Sheet>
   );
@@ -349,9 +367,10 @@ const CatEditSheet = ({ open, cat, passcode, existingCount, onClose, onSave, onD
   const [label, setLabel] = useAS('');
   const [busy, setBusy] = useAS(false);
   const [err, setErr] = useAS('');
+  const [confirmDel, setConfirmDel] = useAS(false);
 
   useAE(() => {
-    if (open) { setLabel(cat?.label || ''); setErr(''); }
+    if (open) { setLabel(cat?.label || ''); setErr(''); setConfirmDel(false); }
   }, [open, cat]);
 
   const save = async () => {
@@ -371,7 +390,6 @@ const CatEditSheet = ({ open, cat, passcode, existingCount, onClose, onSave, onD
   };
 
   const del = async () => {
-    if (!window.confirm(`delete "${cat?.label}"? all items in it will be deleted too.`)) return;
     setBusy(true);
     try { await adminCall('crumbs_hyd_delete_category', { p_passcode: passcode, p_id: cat.id }); onDelete(); }
     catch (e) { setErr(e.message || 'delete failed'); setBusy(false); }
@@ -388,6 +406,23 @@ const CatEditSheet = ({ open, cat, passcode, existingCount, onClose, onSave, onD
             placeholder="e.g. Seasonal specials" style={aFieldStyle}/>
         </AField>
         {err && <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--red)' }}>{err}</div>}
+        {confirmDel ? (
+          <div style={{ background: 'rgba(255,48,48,0.07)', border: '1px solid rgba(255,48,48,0.2)', borderRadius: 'var(--radius-md)', padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 12 }}>
+              delete "{cat?.label}"? all items in it will be deleted too.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={del} disabled={busy} style={{
+                flex: 1, padding: '12px', background: 'var(--red)', color: 'var(--cream)',
+                borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+              }}>{busy ? 'deleting…' : 'yes, delete'}</button>
+              <button onClick={() => setConfirmDel(false)} disabled={busy} style={{
+                flex: 1, padding: '12px', background: 'rgba(26,15,11,0.06)', color: 'var(--ink)',
+                borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
+              }}>cancel</button>
+            </div>
+          </div>
+        ) : (
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={save} disabled={busy} style={{
             flex: 1, padding: '14px', background: busy ? 'rgba(26,15,11,0.4)' : 'var(--ink)',
@@ -396,7 +431,7 @@ const CatEditSheet = ({ open, cat, passcode, existingCount, onClose, onSave, onD
             {busy ? 'saving…' : 'save category'}
           </button>
           {!isNew && (
-            <button onClick={del} disabled={busy} style={{
+            <button onClick={() => setConfirmDel(true)} disabled={busy} style={{
               padding: '14px 16px', background: 'rgba(255,48,48,0.08)', color: 'var(--red)',
               borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600,
             }}>
@@ -404,6 +439,7 @@ const CatEditSheet = ({ open, cat, passcode, existingCount, onClose, onSave, onD
             </button>
           )}
         </div>
+        )}
       </div>
     </Sheet>
   );

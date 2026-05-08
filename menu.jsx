@@ -403,7 +403,8 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
   const [q, setQ] = useState('');
   const [favOnly, setFavOnly] = useState(false);
   const [toppingsFor, setToppingsFor] = useState(null);
-  const [gallery, setGallery] = useState(null); // { images, idx }
+  const [gallery, setGallery] = useState(null);
+  const scrollRef = useRef(null);
   const data = window.CRUMBS_DATA;
 
   const filtered = useMemo(() => {
@@ -438,7 +439,12 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
 
   const onJump = (id) => {
     setActive(id);
-    document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const container = scrollRef.current;
+    const el = document.getElementById(`sec-${id}`);
+    if (container && el) {
+      const offset = el.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      container.scrollBy({ top: offset - 120, behavior: 'smooth' });
+    }
   };
 
   const makeQtyOf = (id) => (vi) => cart.filter(l => l.id === id && l.vi === vi).reduce((s,l)=>s+l.qty,0);
@@ -470,7 +476,7 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
   }, 0);
 
   return (
-    <div onScroll={onScroll} style={{ height: '100vh', overflowY: 'auto', background: 'var(--cream)' }}>
+    <div ref={scrollRef} onScroll={onScroll} style={{ height: '100vh', overflowY: 'auto', background: 'var(--cream)' }}>
       <MenuHeader go={go} scroll={scroll} headerStyle={tweaks.headerStyle}/>
       <CategoryBar active={active} onSelect={onJump} q={q} setQ={setQ}
         favOnly={favOnly} setFavOnly={setFavOnly} favCount={favs.length}/>
