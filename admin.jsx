@@ -171,7 +171,7 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
         p_name: form.name.trim(),
         p_blurb: form.blurb.trim(),
         p_more: form.more.trim(),
-        p_tag: form.tag.trim() || null,
+        p_tag: (form.tag || '').trim() || null,
         p_variants: form.variants,
         p_toppings: form.toppings,
         p_sort_order: sortOrder,
@@ -206,15 +206,15 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
         </AField>
 
         <AField label="tag (optional — e.g. bestseller)">
-          <input value={form.tag} onChange={e => set('tag', e.target.value)} placeholder="leave blank for none" style={aFieldStyle}/>
+          <input value={form.tag || ''} onChange={e => set('tag', e.target.value)} placeholder="leave blank for none" style={aFieldStyle}/>
         </AField>
 
         <AField label="short blurb">
-          <textarea value={form.blurb} onChange={e => set('blurb', e.target.value)} rows={2} placeholder="one punchy line shown in menu…" style={aFieldStyle}/>
+          <textarea value={form.blurb || ''} onChange={e => set('blurb', e.target.value)} rows={2} placeholder="one punchy line shown in menu…" style={aFieldStyle}/>
         </AField>
 
         <AField label="full description (see more)">
-          <textarea value={form.more} onChange={e => set('more', e.target.value)} rows={3} placeholder="expanded detail when customer taps 'see more'…" style={aFieldStyle}/>
+          <textarea value={form.more || ''} onChange={e => set('more', e.target.value)} rows={3} placeholder="expanded detail when customer taps 'see more'…" style={aFieldStyle}/>
         </AField>
 
         {/* Variants */}
@@ -227,11 +227,11 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
               <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 10, borderBottom: '1px dashed var(--line)' }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input value={v.label} onChange={e => setVar(i, 'label', e.target.value)}
-                    placeholder="label (e.g. classic, box of 6)" style={{ ...aFieldStyle, flex: 2 }}/>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, position: 'relative' }}>
+                    placeholder="label (e.g. classic, box of 6)" style={{ ...aFieldStyle, flex: 2, minWidth: 0, width: 'auto' }}/>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 60, position: 'relative' }}>
                     <span style={{ position: 'absolute', left: 10, color: 'var(--ink-3)', fontSize: 14 }}>₹</span>
                     <input type="number" value={v.price} onChange={e => setVar(i, 'price', e.target.value)}
-                      min={0} style={{ ...aFieldStyle, paddingLeft: 24, flex: 1 }}/>
+                      min={0} style={{ ...aFieldStyle, paddingLeft: 24, width: '100%' }}/>
                   </div>
                   {form.variants.length > 1 && (
                     <button onClick={() => removeVar(i)} style={{ width: 30, height: 30, borderRadius: 999, background: 'rgba(255,48,48,0.1)', color: 'var(--red)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
