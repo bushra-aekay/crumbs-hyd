@@ -159,7 +159,8 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
 
   const save = async () => {
     if (!form.name.trim() || !form.cat) { setErr('name and category required'); return; }
-    if (!form.variants.length || form.variants.some(v => !v.label.trim())) { setErr('each variant needs a label'); return; }
+    if (!form.variants.length) { setErr('at least one variant with a price is required'); return; }
+    if (form.variants.length > 1 && form.variants.some(v => !v.label.trim())) { setErr('each variant needs a label so customers can tell them apart'); return; }
     setBusy(true); setErr('');
     try {
       const itemId = (isNew || !form.id) ? slugify(form.name) : form.id;
@@ -205,9 +206,27 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
           <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Choco-chunk cookie" style={aFieldStyle}/>
         </AField>
 
-        <AField label="tag (optional — e.g. bestseller)">
-          <input value={form.tag || ''} onChange={e => set('tag', e.target.value)} placeholder="leave blank for none" style={aFieldStyle}/>
-        </AField>
+        {/* Coming soon toggle */}
+        {(() => {
+          const isComing = form.tag === 'coming soon';
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', marginBottom: 14, borderRadius: 8, background: isComing ? 'rgba(255,48,48,0.05)' : 'rgba(26,15,11,0.03)', border: '1px solid var(--line)' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>coming soon</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>shows in menu but no add-to-cart</div>
+              </div>
+              <button onClick={() => set('tag', isComing ? '' : 'coming soon')} style={{ width: 44, height: 26, borderRadius: 999, background: isComing ? 'var(--red)' : 'rgba(26,15,11,0.15)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 3, left: isComing ? 21 : 3, width: 20, height: 20, borderRadius: 999, background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}/>
+              </button>
+            </div>
+          );
+        })()}
+
+        {form.tag !== 'coming soon' && (
+          <AField label="tag (optional — e.g. bestseller)">
+            <input value={form.tag || ''} onChange={e => set('tag', e.target.value)} placeholder="leave blank for none" style={aFieldStyle}/>
+          </AField>
+        )}
 
         <AField label="short blurb">
           <textarea value={form.blurb || ''} onChange={e => set('blurb', e.target.value)} rows={2} placeholder="one punchy line shown in menu…" style={aFieldStyle}/>

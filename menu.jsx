@@ -221,6 +221,7 @@ const ItemRow = ({ item, qtyOf, onAdd, onInc, onDec, onOpenGallery, fav, onToggl
   const hasMore = !!item.more;
   const hasToppings = item.toppings?.length > 0;
   const hasImages = item.images?.length > 0;
+  const isComingSoon = item.tag === 'coming soon';
 
   return (
     <div style={{
@@ -236,8 +237,8 @@ const ItemRow = ({ item, qtyOf, onAdd, onInc, onDec, onOpenGallery, fav, onToggl
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             {item.tag && (
-              <div className="serif-italic" style={{ fontSize: 12, color: 'var(--red-deep)', marginBottom: 4 }}>
-                ✦ {item.tag}
+              <div className="serif-italic" style={{ fontSize: 12, color: isComingSoon ? 'var(--ink-3)' : 'var(--red-deep)', marginBottom: 4 }}>
+                {isComingSoon ? '◦ coming soon' : `✦ ${item.tag}`}
               </div>
             )}
             <div className="serif" style={{ fontSize: 20, lineHeight: 1.15, letterSpacing: '-0.01em' }}>
@@ -293,7 +294,7 @@ const ItemRow = ({ item, qtyOf, onAdd, onInc, onDec, onOpenGallery, fav, onToggl
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
           <span className="serif" style={{ fontSize: 18, color: 'var(--ink)' }}>{fmt(v.price)}</span>
-          {item.variants.length === 1 && (
+          {item.variants.length === 1 && v.label && (
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>· {v.label}</span>
           )}
         </div>
@@ -320,8 +321,14 @@ const ItemRow = ({ item, qtyOf, onAdd, onInc, onDec, onOpenGallery, fav, onToggl
           <ProductMark id={item.id} size={84}/>
         ) : null}
 
-        {/* For topping items: always show add (re-opens sheet) + count */}
-        {hasToppings ? (
+        {/* Coming soon — no add button */}
+        {isComingSoon ? (
+          <div style={{
+            padding: '7px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            color: 'var(--ink-3)', border: '1px solid var(--line)',
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+          }}>soon</div>
+        ) : hasToppings ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             {inCart && (
               <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
