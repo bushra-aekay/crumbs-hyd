@@ -53,8 +53,8 @@ const useMenuData = () => {
             if (clean.length !== saved.length) localStorage.setItem('crumbs-cart', JSON.stringify(clean));
           } catch {}
         }
-      } catch (e) {
-        console.warn('Supabase fetch failed, using local data', e);
+      } catch {
+        // Supabase unavailable — static data.js fallback remains active
       }
       setReady(true);
     })();

@@ -19,33 +19,39 @@ const AdminGate = ({ onEnter }) => {
   const [err, setErr] = useAS('');
   const [busy, setBusy] = useAS(false);
   const [show, setShow] = useAS(false);
+  const [attempts, setAttempts] = useAS(0);
+  const [lockUntil, setLockUntil] = useAS(0);
 
   const verify = async () => {
+    const now = Date.now();
+    if (now < lockUntil) {
+      setErr(`too many attempts — wait ${Math.ceil((lockUntil - now) / 1000)}s`);
+      return;
+    }
     if (!pc.trim()) return;
     setBusy(true); setErr('');
     try {
       const db = window.crumbsDB;
-      if (!db) { setErr('supabase not connected'); setBusy(false); return; }
-
-      let isValid = false;
-
-      // Try the RPC first (available after running supabase-admin-functions.sql)
-      const { data: rpcData, error: rpcErr } = await db.rpc('crumbs_hyd_admin_check', { p_passcode: pc.trim() });
-      if (!rpcErr) {
-        isValid = !!rpcData;
-      } else {
-        // RPC not set up yet — fall back to direct config table read
-        const { data: cfg, error: cfgErr } = await db
-          .from('crumbs_hyd_config').select('admin_passcode').eq('id', 1).single();
-        if (cfgErr) { setErr('could not reach supabase — check your connection.'); setBusy(false); return; }
-        isValid = cfg?.admin_passcode === pc.trim();
+      if (!db) { setErr('not connected'); setBusy(false); return; }
+      const { data, error } = await db.rpc('crumbs_hyd_admin_check', { p_passcode: pc.trim() });
+      if (error) { setErr('connection error — check your network'); setBusy(false); return; }
+      if (!data) {
+        const next = attempts + 1;
+        setAttempts(next);
+        if (next >= 5) {
+          setLockUntil(Date.now() + 30000);
+          setAttempts(0);
+          setErr('too many attempts — locked for 30s');
+        } else {
+          setErr(`wrong passcode — ${5 - next} attempt${5 - next === 1 ? '' : 's'} left`);
+        }
+        setBusy(false); return;
       }
-
-      if (!isValid) { setErr('wrong passcode — try again.'); setBusy(false); return; }
-      localStorage.setItem('crumbs-admin-pc', pc.trim());
+      setAttempts(0);
+      sessionStorage.setItem('crumbs-admin-pc', pc.trim());
       onEnter(pc.trim());
-    } catch (e) {
-      setErr('connection error: ' + (e.message || 'check supabase setup'));
+    } catch {
+      setErr('connection error — check your network');
     }
     setBusy(false);
   };
@@ -71,8 +77,10 @@ const AdminGate = ({ onEnter }) => {
           <input
             type={show ? 'text' : 'password'}
             value={pc}
-            onChange={e => setPc(e.target.value)}
+            onChange={e => setPc(e.target.value.slice(0, 64))}
             onKeyDown={e => e.key === 'Enter' && verify()}
+            maxLength={64}
+            autoComplete="current-password"
             placeholder="enter passcode…"
             style={{
               flex: 1, padding: '14px 16px', background: 'rgba(253,248,232,0.06)',
@@ -133,17 +141,19 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
 
   const [uploading, setUploading] = useAS(false);
   const uploadImage = async (file) => {
+    if (!file.type.startsWith('image/')) { setErr('only image files allowed'); return; }
+    if (file.size > 5 * 1024 * 1024) { setErr('image too large — max 5 MB'); return; }
     setUploading(true);
     try {
       const db = window.crumbsDB;
-      const ext = file.name.split('.').pop().toLowerCase();
+      const ext = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '');
       const filename = `${(form.id || 'new').replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.${ext}`;
       const { error } = await db.storage.from('crumbs-hyd-images').upload(filename, file, { upsert: true });
       if (error) throw error;
       const { data: { publicUrl } } = db.storage.from('crumbs-hyd-images').getPublicUrl(filename);
       setForm(f => ({ ...f, images: [...f.images, publicUrl] }));
-    } catch (e) {
-      setErr('upload failed: ' + (e.message || 'try again'));
+    } catch {
+      setErr('upload failed — check your connection and try again');
     }
     setUploading(false);
   };
@@ -203,7 +213,7 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
         </AField>
 
         <AField label="name">
-          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Choco-chunk cookie" style={aFieldStyle}/>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Choco-chunk cookie" maxLength={100} style={aFieldStyle}/>
         </AField>
 
         {/* Coming soon toggle */}
@@ -229,11 +239,11 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
         )}
 
         <AField label="short blurb">
-          <textarea value={form.blurb || ''} onChange={e => set('blurb', e.target.value)} rows={2} placeholder="one punchy line shown in menu…" style={aFieldStyle}/>
+          <textarea value={form.blurb || ''} onChange={e => set('blurb', e.target.value)} rows={2} maxLength={300} placeholder="one punchy line shown in menu…" style={aFieldStyle}/>
         </AField>
 
         <AField label="full description (see more)">
-          <textarea value={form.more || ''} onChange={e => set('more', e.target.value)} rows={3} placeholder="expanded detail when customer taps 'see more'…" style={aFieldStyle}/>
+          <textarea value={form.more || ''} onChange={e => set('more', e.target.value)} rows={3} maxLength={1000} placeholder="expanded detail when customer taps 'see more'…" style={aFieldStyle}/>
         </AField>
 
         {/* Variants */}
@@ -611,13 +621,14 @@ const SettingsTab = ({ passcode, openToast }) => {
     if (!pcForm.newPc.trim()) return;
     if (pcForm.newPc !== pcForm.confirmPc) { openToast('passcodes don\'t match'); return; }
     if (pcForm.newPc.length < 8) { openToast('passcode too short (min 8 chars)'); return; }
+    if (!/[a-zA-Z]/.test(pcForm.newPc) || !/[0-9]/.test(pcForm.newPc)) { openToast('passcode must contain letters and numbers'); return; }
     setPcBusy(true);
     try {
       await adminCall('crumbs_hyd_change_passcode', { p_old_passcode: passcode, p_new_passcode: pcForm.newPc.trim() });
-      localStorage.setItem('crumbs-admin-pc', pcForm.newPc.trim());
+      sessionStorage.setItem('crumbs-admin-pc', pcForm.newPc.trim());
       setPcForm({ newPc: '', confirmPc: '' });
       openToast('passcode changed — save it somewhere safe!');
-    } catch (e) { openToast('error: ' + (e.message || 'change failed')); }
+    } catch { openToast('change failed — check your connection'); }
     setPcBusy(false);
   };
 
@@ -649,12 +660,12 @@ const SettingsTab = ({ passcode, openToast }) => {
 
       <div style={{ background: '#fff', borderRadius: 'var(--radius-md)', padding: '18px 18px 20px', border: '1px solid var(--line)' }}>
         <div className="serif" style={{ fontSize: 20, marginBottom: 4 }}>change passcode</div>
-        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16 }}>current passcode: <span className="mono" style={{ background: 'rgba(26,15,11,0.06)', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{passcode}</span></div>
+        <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16 }}>min 8 characters · must include letters and numbers</div>
         <AField label="new passcode">
-          <input type="password" value={pcForm.newPc} onChange={e => setPcForm(f => ({ ...f, newPc: e.target.value }))} placeholder="min 8 characters" style={aFieldStyle}/>
+          <input type="password" value={pcForm.newPc} onChange={e => setPcForm(f => ({ ...f, newPc: e.target.value.slice(0, 64) }))} placeholder="new passcode…" maxLength={64} autoComplete="new-password" style={aFieldStyle}/>
         </AField>
         <AField label="confirm new passcode">
-          <input type="password" value={pcForm.confirmPc} onChange={e => setPcForm(f => ({ ...f, confirmPc: e.target.value }))} style={aFieldStyle}/>
+          <input type="password" value={pcForm.confirmPc} onChange={e => setPcForm(f => ({ ...f, confirmPc: e.target.value.slice(0, 64) }))} maxLength={64} autoComplete="new-password" style={aFieldStyle}/>
         </AField>
         <button onClick={changePasscode} disabled={pcBusy || !pcForm.newPc} style={{
           width: '100%', padding: '13px', background: (!pcForm.newPc || pcBusy) ? 'rgba(255,48,48,0.2)' : 'var(--red)',
@@ -736,13 +747,13 @@ const AdminPanel = ({ passcode, go, reload, openToast, onLogout }) => {
 // ─── ADMIN ROOT ───────────────────────────────────────────────────────────────
 const Admin = ({ go, reload, openToast }) => {
   const [step, setStep] = useAS(() => {
-    const saved = localStorage.getItem('crumbs-admin-pc');
+    const saved = sessionStorage.getItem('crumbs-admin-pc');
     return saved ? 'panel' : 'gate';
   });
-  const [passcode, setPasscode] = useAS(() => localStorage.getItem('crumbs-admin-pc') || '');
+  const [passcode, setPasscode] = useAS(() => sessionStorage.getItem('crumbs-admin-pc') || '');
 
   const onEnter = (pc) => { setPasscode(pc); setStep('panel'); };
-  const onLogout = () => { localStorage.removeItem('crumbs-admin-pc'); setPasscode(''); setStep('gate'); };
+  const onLogout = () => { sessionStorage.removeItem('crumbs-admin-pc'); setPasscode(''); setStep('gate'); };
 
   if (step === 'gate') return <AdminGate onEnter={onEnter}/>;
   return <AdminPanel passcode={passcode} go={go} reload={reload} openToast={openToast} onLogout={onLogout}/>;
