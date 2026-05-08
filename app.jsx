@@ -43,6 +43,7 @@ const useMenuData = () => {
           window.CRUMBS_DATA.items = items.map(i => ({
             id: i.id, cat: i.cat, name: i.name, blurb: i.blurb, more: i.more,
             tag: i.tag, variants: i.variants, toppings: i.toppings,
+            images: i.images || [],
           }));
           // Purge any localStorage cart lines for items that no longer exist
           try {

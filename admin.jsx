@@ -3,7 +3,7 @@ const { useState: useAS, useEffect: useAE, useRef: useAR } = React;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36);
-const newVariant = () => ({ label: '', price: 0 });
+const newVariant = () => ({ label: '', price: 0, desc: '' });
 const newTopping = () => ({ id: 'top-' + Date.now().toString(36), label: '', price: 0 });
 
 const adminCall = async (fn, params) => {
@@ -113,13 +113,13 @@ const AdminGate = ({ onEnter }) => {
 // ─── ITEM EDIT SHEET ──────────────────────────────────────────────────────────
 const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }) => {
   const isNew = !item?.id || item._new;
-  const blank = { id: '', cat: cats[0]?.id || '', name: '', blurb: '', more: '', tag: '', variants: [newVariant()], toppings: [], _new: true };
+  const blank = { id: '', cat: cats[0]?.id || '', name: '', blurb: '', more: '', tag: '', variants: [newVariant()], toppings: [], images: [], _new: true };
   const [form, setForm] = useAS(blank);
   const [busy, setBusy] = useAS(false);
   const [err, setErr] = useAS('');
 
   useAE(() => {
-    if (open) { setForm(item ? { ...item, variants: [...(item.variants||[])], toppings: [...(item.toppings||[])] } : blank); setErr(''); }
+    if (open) { setForm(item ? { ...item, variants: [...(item.variants||[])], toppings: [...(item.toppings||[])], images: [...(item.images||[])] } : blank); setErr(''); }
   }, [open, item]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -129,6 +129,32 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
   const removeVar = (i) => setForm(f => ({ ...f, variants: f.variants.filter((_, idx) => idx !== i) }));
   const addTop = () => setForm(f => ({ ...f, toppings: [...f.toppings, newTopping()] }));
   const removeTop = (i) => setForm(f => ({ ...f, toppings: f.toppings.filter((_, idx) => idx !== i) }));
+
+  const [uploading, setUploading] = useAS(false);
+  const uploadImage = async (file) => {
+    setUploading(true);
+    try {
+      const db = window.crumbsDB;
+      const ext = file.name.split('.').pop().toLowerCase();
+      const filename = `${(form.id || 'new').replace(/[^a-z0-9]/gi, '-')}-${Date.now()}.${ext}`;
+      const { error } = await db.storage.from('crumbs-hyd-images').upload(filename, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = db.storage.from('crumbs-hyd-images').getPublicUrl(filename);
+      setForm(f => ({ ...f, images: [...f.images, publicUrl] }));
+    } catch (e) {
+      setErr('upload failed: ' + (e.message || 'try again'));
+    }
+    setUploading(false);
+  };
+  const removeImage = async (i) => {
+    const url = form.images[i];
+    try {
+      const db = window.crumbsDB;
+      const filename = url.split('/').pop();
+      await db.storage.from('crumbs-hyd-images').remove([filename]);
+    } catch {}
+    setForm(f => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }));
+  };
 
   const save = async () => {
     if (!form.name.trim() || !form.cat) { setErr('name and category required'); return; }
@@ -148,6 +174,7 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
         p_variants: form.variants,
         p_toppings: form.toppings,
         p_sort_order: sortOrder,
+        p_images: form.images,
       });
       onSave();
     } catch (e) { setErr(e.message || 'save failed'); }
@@ -195,21 +222,26 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
           <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-3)', fontWeight: 600, marginBottom: 10 }}>
             variants & prices
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {form.variants.map((v, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input value={v.label} onChange={e => setVar(i, 'label', e.target.value)}
-                  placeholder="label (e.g. classic, box of 6)" style={{ ...aFieldStyle, flex: 2 }}/>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: 10, color: 'var(--ink-3)', fontSize: 14 }}>₹</span>
-                  <input type="number" value={v.price} onChange={e => setVar(i, 'price', e.target.value)}
-                    min={0} style={{ ...aFieldStyle, paddingLeft: 24, flex: 1 }}/>
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 10, borderBottom: '1px dashed var(--line)' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input value={v.label} onChange={e => setVar(i, 'label', e.target.value)}
+                    placeholder="label (e.g. classic, box of 6)" style={{ ...aFieldStyle, flex: 2 }}/>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 10, color: 'var(--ink-3)', fontSize: 14 }}>₹</span>
+                    <input type="number" value={v.price} onChange={e => setVar(i, 'price', e.target.value)}
+                      min={0} style={{ ...aFieldStyle, paddingLeft: 24, flex: 1 }}/>
+                  </div>
+                  {form.variants.length > 1 && (
+                    <button onClick={() => removeVar(i)} style={{ width: 30, height: 30, borderRadius: 999, background: 'rgba(255,48,48,0.1)', color: 'var(--red)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <Icon name="close" size={14}/>
+                    </button>
+                  )}
                 </div>
-                {form.variants.length > 1 && (
-                  <button onClick={() => removeVar(i)} style={{ width: 30, height: 30, borderRadius: 999, background: 'rgba(255,48,48,0.1)', color: 'var(--red)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    <Icon name="close" size={14}/>
-                  </button>
-                )}
+                <input value={v.desc || ''} onChange={e => setVar(i, 'desc', e.target.value)}
+                  placeholder="flavour description (optional — shown in menu when this variant is selected)"
+                  style={{ ...aFieldStyle, fontSize: 12 }}/>
               </div>
             ))}
           </div>
@@ -220,6 +252,40 @@ const ItemEditSheet = ({ open, item, cats, passcode, onClose, onSave, onDelete }
           }}>
             <Icon name="plus" size={13}/> add variant
           </button>
+        </div>
+
+        {/* Photos */}
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-3)', fontWeight: 600, marginBottom: 10 }}>
+            photos (optional)
+          </div>
+          {form.images.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              {form.images.map((url, i) => (
+                <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '1px solid var(--line)' }}/>
+                  <button onClick={() => removeImage(i)} style={{
+                    position: 'absolute', top: -6, right: -6,
+                    width: 20, height: 20, borderRadius: 999,
+                    background: 'var(--red)', color: '#fff',
+                    fontSize: 12, display: 'grid', placeItems: 'center',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                  }}>×</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: uploading ? 'wait' : 'pointer' }}>
+            <input type="file" accept="image/*" onChange={e => e.target.files[0] && uploadImage(e.target.files[0])} style={{ display: 'none' }}/>
+            <span style={{
+              padding: '7px 12px', fontSize: 12, fontWeight: 600,
+              color: uploading ? 'var(--ink-3)' : 'var(--ink-2)',
+              border: '1.5px dashed var(--line)', borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <Icon name="plus" size={13}/> {uploading ? 'uploading…' : 'add photo'}
+            </span>
+          </label>
         </div>
 
         {/* Toppings */}
