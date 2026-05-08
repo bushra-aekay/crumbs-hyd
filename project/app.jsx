@@ -4,7 +4,6 @@ const { useState, useReducer, useEffect } = React;
 const cartReducer = (state, a) => {
   switch (a.t) {
     case 'add': {
-      // Items with toppings get their own line (toppings = unique signature)
       const sig = (a.toppings || []).slice().sort().join(',');
       const ex = state.find(l => l.id === a.id && l.vi === a.vi && (l.sig || '') === sig);
       if (ex) return state.map(l => l === ex ? { ...l, qty: l.qty + 1 } : l);
@@ -21,8 +20,53 @@ const cartReducer = (state, a) => {
   }
 };
 
+// Load menu from Supabase and merge into window.CRUMBS_DATA (fallback to static)
+const useMenuData = () => {
+  const [ready, setReady] = useState(false);
+  const [version, setVersion] = useState(0);
+
+  const reload = () => setVersion(v => v + 1);
+
+  useEffect(() => {
+    const db = window.crumbsDB;
+    if (!db) { setReady(true); return; }
+    (async () => {
+      try {
+        const [{ data: cats, error: ce }, { data: items, error: ie }] = await Promise.all([
+          db.from('crumbs_hyd_categories').select('*').order('sort_order'),
+          db.from('crumbs_hyd_items').select('*').order('sort_order'),
+        ]);
+        if (!ce && cats?.length) {
+          window.CRUMBS_DATA.categories = cats.map(c => ({ id: c.id, label: c.label }));
+        }
+        if (!ie && items?.length) {
+          window.CRUMBS_DATA.items = items.map(i => ({
+            id: i.id, cat: i.cat, name: i.name, blurb: i.blurb, more: i.more,
+            tag: i.tag, variants: i.variants, toppings: i.toppings,
+            images: i.images || [],
+          }));
+          // Purge any localStorage cart lines for items that no longer exist
+          try {
+            const saved = JSON.parse(localStorage.getItem('crumbs-cart') || '[]');
+            const ids = new Set(window.CRUMBS_DATA.items.map(i => i.id));
+            const clean = saved.filter(l => ids.has(l.id));
+            if (clean.length !== saved.length) localStorage.setItem('crumbs-cart', JSON.stringify(clean));
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Supabase fetch failed, using local data', e);
+      }
+      setReady(true);
+    })();
+  }, [version]);
+
+  return { ready, reload };
+};
+
 const App = () => {
   const [route, go] = useRoute();
+  const { ready, reload } = useMenuData();
+
   const [cart, dispatch] = useReducer(cartReducer, [], () => {
     try { return JSON.parse(localStorage.getItem('crumbs-cart') || '[]'); } catch { return []; }
   });
@@ -43,15 +87,28 @@ const App = () => {
   };
 
   const [tweaks, setTweak] = useTweaks(window.TWEAK_DEFAULTS);
-
-  // Apply accent color live
   useEffect(() => {
     document.documentElement.style.setProperty('--red', tweaks.accent);
   }, [tweaks.accent]);
 
+  if (!ready) {
+    return (
+      <div className="crumbs-app" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        minHeight: '100vh', flexDirection: 'column', gap: 14,
+        background: 'var(--cream)',
+      }}>
+        <div className="serif" style={{ fontSize: 36, color: 'var(--red)' }}>Crumbs.hyd</div>
+        <div style={{ fontSize: 13, color: 'var(--ink-3)' }}>loading the menu…</div>
+      </div>
+    );
+  }
+
   return (
     <div className="crumbs-app">
-      {route === 'menu' ? (
+      {route === 'crumbs-kitchen-secrets-admin' ? (
+        <Admin go={go} reload={reload} openToast={openToast}/>
+      ) : route === 'menu' ? (
         <Menu go={go} tweaks={tweaks} cart={cart} dispatch={dispatch}
           favs={favs} toggleFav={toggleFav}
           openCart={() => setCartOpen(true)} openToast={openToast}/>
@@ -59,16 +116,23 @@ const App = () => {
         <Home go={go}/>
       )}
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)}
-        cart={cart} dispatch={dispatch}
-        onCheckout={() => { setCartOpen(false); setTimeout(() => setCheckoutOpen(true), 200); }}/>
+      {route !== 'crumbs-kitchen-secrets-admin' && (
+        <>
+          <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)}
+            cart={cart} dispatch={dispatch}
+            onCheckout={() => { setCartOpen(false); setTimeout(() => setCheckoutOpen(true), 200); }}/>
 
-      <CheckoutSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)}
-        cart={cart} openToast={openToast}/>
+          <CheckoutSheet open={checkoutOpen} onClose={() => setCheckoutOpen(false)}
+            cart={cart} openToast={openToast}/>
 
-      <Toast msg={toast.msg} show={toast.show}/>
+          <Toast msg={toast.msg} show={toast.show}/>
+          <CrumbsTweaks tweaks={tweaks} setTweak={setTweak}/>
+        </>
+      )}
 
-      <CrumbsTweaks tweaks={tweaks} setTweak={setTweak}/>
+      {route === 'crumbs-kitchen-secrets-admin' && (
+        <Toast msg={toast.msg} show={toast.show}/>
+      )}
     </div>
   );
 };

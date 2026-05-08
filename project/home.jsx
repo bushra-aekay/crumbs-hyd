@@ -72,7 +72,7 @@ const Home = ({ go }) => {
       <div style={{ padding: '32px 22px 28px', display: 'grid', gap: 18 }}>
         <Stat label="rated" value="4.9" sub={`${brand.reviews}+ orders`} />
         <Stat label="bake to order" value="4–12h" sub="minimum prior notice, please" />
-        <Stat label="pickup" value="mehdipatnam" sub="hyderabad · parcel can be arranged" />
+        <Stat label="based in" value="Mehdipatnam" sub="hyderabad · uber & parcel only" small />
       </div>
 
       <div style={{
@@ -86,9 +86,9 @@ const Home = ({ go }) => {
   );
 };
 
-const Stat = ({ label, value, sub }) => (
+const Stat = ({ label, value, sub, small }) => (
   <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, paddingBottom: 14, borderBottom: '1px solid var(--line-cream)' }}>
-    <div className="serif" style={{ fontSize: 44, lineHeight: 1, minWidth: 90 }}>{value}</div>
+    <div className="serif" style={{ fontSize: small ? 26 : 44, lineHeight: 1, minWidth: small ? 0 : 90 }}>{value}</div>
     <div>
       <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.6 }}>{label}</div>
       <div style={{ fontSize: 14, opacity: 0.85 }}>{sub}</div>

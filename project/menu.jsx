@@ -55,7 +55,7 @@ const MenuHeader = ({ go, scroll, headerStyle }) => {
           <div style={{ marginTop: 22, display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
             <Pill icon="star" text={`${brand.rating} · ${brand.reviews}+ orders`}/>
             <Pill icon="pin" text={brand.location}/>
-            <Pill icon="clock" text="pickup only · order ahead"/>
+            <Pill icon="clock" text="uber / rapido · order ahead"/>
           </div>
 
           <p className="serif-italic" style={{
@@ -150,12 +150,77 @@ const CategoryBar = ({ active, onSelect, q, setQ, favOnly, setFavOnly, favCount 
 };
 
 // ─── ITEM ROW ────────────────────────────────────────────────────────────
-const ItemRow = ({ item, qty, onAdd, onInc, onDec, fav, onToggleFav, showMarks, layout, ctaStyle }) => {
+// ─── IMAGE GALLERY OVERLAY ───────────────────────────────────────────────────
+const ImageGallery = ({ images, startIdx = 0, onClose }) => {
+  const [idx, setIdx] = useState(startIdx);
+  const touchX = useRef(null);
+  const prev = () => setIdx(i => (i - 1 + images.length) % images.length);
+  const next = () => setIdx(i => (i + 1) % images.length);
+
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key === 'ArrowLeft') prev();
+      else if (e.key === 'ArrowRight') next();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)',
+      zIndex: 300, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center', padding: '20px',
+    }}>
+      <button onClick={e => { e.stopPropagation(); onClose(); }} style={{
+        position: 'absolute', top: 16, right: 20,
+        color: 'rgba(255,255,255,0.7)', fontSize: 30, lineHeight: 1,
+      }}>×</button>
+
+      <img
+        src={images[idx]} alt=""
+        onClick={e => e.stopPropagation()}
+        onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          const diff = touchX.current - e.changedTouches[0].clientX;
+          if (Math.abs(diff) > 50) diff > 0 ? next() : prev();
+          touchX.current = null;
+        }}
+        style={{ maxWidth: '100%', maxHeight: '75vh', objectFit: 'contain', borderRadius: 12, userSelect: 'none' }}
+      />
+
+      {images.length > 1 && (
+        <>
+          <div style={{ marginTop: 14, color: 'rgba(255,255,255,0.55)', fontSize: 13 }}>
+            {idx + 1} / {images.length}
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 10 }}>
+            {[['←', prev], ['→', next]].map(([label, fn]) => (
+              <button key={label} onClick={e => { e.stopPropagation(); fn(); }} style={{
+                width: 44, height: 44, borderRadius: 999,
+                background: 'rgba(255,255,255,0.14)', color: '#fff',
+                display: 'grid', placeItems: 'center', fontSize: 18,
+              }}>{label}</button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ─── ITEM ROW ────────────────────────────────────────────────────────────────
+const ItemRow = ({ item, qtyOf, onAdd, onInc, onDec, onOpenGallery, fav, onToggleFav, showMarks, layout, ctaStyle }) => {
   const [variantIdx, setVariantIdx] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const v = item.variants[variantIdx];
+  // Per-variant qty — fixes the "variant 1 in cart makes variant 2 look in-cart" bug
+  const qty = qtyOf(variantIdx);
   const inCart = qty > 0;
   const hasMore = !!item.more;
+  const hasToppings = item.toppings?.length > 0;
+  const hasImages = item.images?.length > 0;
 
   return (
     <div style={{
@@ -189,21 +254,17 @@ const ItemRow = ({ item, qty, onAdd, onInc, onDec, fav, onToggleFav, showMarks, 
           </button>
         </div>
 
+        {/* Blurb — shows variant desc if set, otherwise item blurb */}
         <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.45, marginBottom: 6 }}>
-          {item.blurb}
+          {v.desc || item.blurb}
         </div>
 
         {hasMore && (
           <>
-            <div style={{
-              maxHeight: expanded ? 200 : 0,
-              overflow: 'hidden',
-              transition: 'max-height 0.3s ease',
-            }}>
-              <div style={{
-                fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.55,
-                paddingTop: 4, paddingBottom: 8,
-              }}>{item.more}</div>
+            <div style={{ maxHeight: expanded ? 200 : 0, overflow: 'hidden', transition: 'max-height 0.3s ease' }}>
+              <div style={{ fontSize: 12.5, color: 'var(--ink-3)', lineHeight: 1.55, paddingTop: 4, paddingBottom: 8 }}>
+                {item.more}
+              </div>
             </div>
             <button onClick={() => setExpanded(x => !x)} style={{
               fontSize: 11.5, color: 'var(--red)', fontWeight: 500,
@@ -216,7 +277,7 @@ const ItemRow = ({ item, qty, onAdd, onInc, onDec, fav, onToggleFav, showMarks, 
           </>
         )}
 
-        {/* variant pills (only if >1) */}
+        {/* Variant pills — each tracks its own qty independently */}
         {item.variants.length > 1 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10, marginTop: 4 }}>
             {item.variants.map((vv, i) => (
@@ -238,40 +299,77 @@ const ItemRow = ({ item, qty, onAdd, onInc, onDec, fav, onToggleFav, showMarks, 
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, position: 'relative' }}>
-        {showMarks && <ProductMark id={item.id} size={84}/>}
-        <div style={{ position: 'relative', marginTop: showMarks ? -14 : 0, display: 'flex', justifyContent: 'center' }}>
-          {!inCart ? (
+      {/* Right column — image (or mark) + add control */}
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+        {hasImages ? (
+          <button onClick={() => onOpenGallery(item.images, 0)} style={{
+            width: 84, height: 84, borderRadius: 12, overflow: 'hidden',
+            position: 'relative', display: 'block', flexShrink: 0,
+          }}>
+            <img src={item.images[0]} alt={item.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}/>
+            {item.images.length > 1 && (
+              <div style={{
+                position: 'absolute', bottom: 4, right: 4,
+                background: 'rgba(0,0,0,0.55)', color: '#fff',
+                fontSize: 9, padding: '2px 5px', borderRadius: 999, fontWeight: 600,
+              }}>1/{item.images.length}</div>
+            )}
+          </button>
+        ) : showMarks ? (
+          <ProductMark id={item.id} size={84}/>
+        ) : null}
+
+        {/* For topping items: always show add (re-opens sheet) + count */}
+        {hasToppings ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {inCart && (
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600 }}>
+                {qty} added
+              </div>
+            )}
             <button onClick={() => onAdd(item.id, variantIdx)}
               style={ctaStyle === 'pill' ? {
                 background: 'var(--cream)', color: 'var(--red)', border: '1.5px solid var(--red)',
-                padding: '8px 20px', borderRadius: 6, fontWeight: 600, fontSize: 13,
-                letterSpacing: '0.06em', textTransform: 'uppercase',
-                boxShadow: '0 2px 0 var(--red)',
+                padding: '8px 14px', borderRadius: 6, fontWeight: 600, fontSize: 13,
+                letterSpacing: '0.06em', textTransform: 'uppercase', boxShadow: '0 2px 0 var(--red)',
               } : {
                 background: 'var(--red)', color: 'var(--cream)',
-                padding: '9px 22px', borderRadius: 6, fontWeight: 600, fontSize: 13,
+                padding: '9px 16px', borderRadius: 6, fontWeight: 600, fontSize: 13,
                 letterSpacing: '0.04em', textTransform: 'uppercase',
               }}>
-              add
+              {inCart ? '+ more' : 'add'}
             </button>
-          ) : (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 0,
+          </div>
+        ) : !inCart ? (
+          <button onClick={() => onAdd(item.id, variantIdx)}
+            style={ctaStyle === 'pill' ? {
+              background: 'var(--cream)', color: 'var(--red)', border: '1.5px solid var(--red)',
+              padding: '8px 20px', borderRadius: 6, fontWeight: 600, fontSize: 13,
+              letterSpacing: '0.06em', textTransform: 'uppercase', boxShadow: '0 2px 0 var(--red)',
+            } : {
               background: 'var(--red)', color: 'var(--cream)',
-              borderRadius: 6, overflow: 'hidden',
-              boxShadow: '0 2px 0 rgba(225,26,26,0.4)',
+              padding: '9px 22px', borderRadius: 6, fontWeight: 600, fontSize: 13,
+              letterSpacing: '0.04em', textTransform: 'uppercase',
             }}>
-              <button onClick={() => onDec(item.id, variantIdx)} style={{ padding: '8px 12px', display: 'grid', placeItems: 'center' }}>
-                <Icon name="minus" size={14}/>
-              </button>
-              <span style={{ minWidth: 18, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>{qty}</span>
-              <button onClick={() => onInc(item.id, variantIdx)} style={{ padding: '8px 12px', display: 'grid', placeItems: 'center' }}>
-                <Icon name="plus" size={14}/>
-              </button>
-            </div>
-          )}
-        </div>
+            add
+          </button>
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            background: 'var(--red)', color: 'var(--cream)',
+            borderRadius: 6, overflow: 'hidden',
+            boxShadow: '0 2px 0 rgba(225,26,26,0.4)',
+          }}>
+            <button onClick={() => onDec(item.id, variantIdx)} style={{ padding: '8px 12px', display: 'grid', placeItems: 'center' }}>
+              <Icon name="minus" size={14}/>
+            </button>
+            <span style={{ minWidth: 18, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>{qty}</span>
+            <button onClick={() => onInc(item.id, variantIdx)} style={{ padding: '8px 12px', display: 'grid', placeItems: 'center' }}>
+              <Icon name="plus" size={14}/>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -304,7 +402,8 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
   const [active, setActive] = useState('cookies');
   const [q, setQ] = useState('');
   const [favOnly, setFavOnly] = useState(false);
-  const [toppingsFor, setToppingsFor] = useState(null); // {item, vi}
+  const [toppingsFor, setToppingsFor] = useState(null);
+  const [gallery, setGallery] = useState(null); // { images, idx }
   const data = window.CRUMBS_DATA;
 
   const filtered = useMemo(() => {
@@ -342,7 +441,7 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
     document.getElementById(`sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const qtyOf = (id, vi) => cart.find(l => l.id === id && l.vi === vi)?.qty || 0;
+  const makeQtyOf = (id) => (vi) => cart.filter(l => l.id === id && l.vi === vi).reduce((s,l)=>s+l.qty,0);
   const onAdd = (id, vi) => {
     const item = data.items.find(i => i.id === id);
     if (item?.toppings?.length) {
@@ -362,8 +461,10 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
   const onDec = (id, vi) => dispatch({ t: 'dec', id, vi });
   const onToggleFav = (id) => { toggleFav(id); openToast(favs.includes(id) ? 'removed from favourites' : 'saved to favourites'); };
 
-  const totalQty = cart.reduce((s, l) => s + l.qty, 0);
-  const totalAmt = cart.reduce((s, l) => {
+  // Only count items that still exist in the live menu
+  const liveCart = cart.filter(l => data.items.find(i => i.id === l.id));
+  const totalQty = liveCart.reduce((s, l) => s + l.qty, 0);
+  const totalAmt = liveCart.reduce((s, l) => {
     const item = data.items.find(i => i.id === l.id);
     return s + (item?.variants[l.vi]?.price || 0) * l.qty;
   }, 0);
@@ -389,8 +490,9 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
                   {items.map(it => (
                     <ItemRow key={it.id} item={it}
-                      qty={cart.filter(l => l.id === it.id).reduce((s,l)=>s+l.qty,0)}
+                      qtyOf={makeQtyOf(it.id)}
                       onAdd={onAdd} onInc={onInc} onDec={onDec}
+                      onOpenGallery={(imgs, idx) => setGallery({ images: imgs, idx })}
                       fav={favs.includes(it.id)} onToggleFav={onToggleFav}
                       showMarks={tweaks.showMarks} layout={tweaks.itemLayout} ctaStyle={tweaks.ctaStyle}/>
                   ))}
@@ -398,9 +500,10 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
               ) : (
                 items.map(it => (
                   <ItemRow key={it.id} item={it}
-                    fav={favs.includes(it.id)} onToggleFav={onToggleFav}
-                    qty={cart.filter(l => l.id === it.id).reduce((s,l)=>s+l.qty,0)}
+                    qtyOf={makeQtyOf(it.id)}
                     onAdd={onAdd} onInc={onInc} onDec={onDec}
+                    onOpenGallery={(imgs, idx) => setGallery({ images: imgs, idx })}
+                    fav={favs.includes(it.id)} onToggleFav={onToggleFav}
                     showMarks={tweaks.showMarks} layout={tweaks.itemLayout} ctaStyle={tweaks.ctaStyle}/>
                 ))
               )}
@@ -455,6 +558,11 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
           </span>
         </button>
       )}
+      {/* Image gallery overlay */}
+      {gallery && (
+        <ImageGallery images={gallery.images} startIdx={gallery.idx} onClose={() => setGallery(null)}/>
+      )}
+
       {/* Toppings picker */}
       <ToppingsSheet open={!!toppingsFor} ctx={toppingsFor}
         onClose={() => setToppingsFor(null)}
