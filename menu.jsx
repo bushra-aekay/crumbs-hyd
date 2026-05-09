@@ -448,10 +448,9 @@ const Menu = ({ go, tweaks, cart, dispatch, openCart, openToast, favs, toggleFav
     setActive(id);
     const container = scrollRef.current;
     const el = document.getElementById(`sec-${id}`);
-    if (container && el) {
-      const offset = el.getBoundingClientRect().top - container.getBoundingClientRect().top;
-      container.scrollBy({ top: offset - 120, behavior: 'smooth' });
-    }
+    if (!container || !el) return;
+    const top = container.scrollTop + el.getBoundingClientRect().top - container.getBoundingClientRect().top - 120;
+    container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   };
 
   const makeQtyOf = (id) => (vi) => cart.filter(l => l.id === id && l.vi === vi).reduce((s,l)=>s+l.qty,0);
